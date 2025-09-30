@@ -1,0 +1,13 @@
+{
+    "title": "The Whispering Compass",
+    "genre": "奇幻",
+    "author": "Elara Vance",
+    "date": "2023-05-15",
+    "description": "A young cartographer discovers a compass that leads not to places, but to truths.",
+    "status": "ongoing",
+    "chapters": [
+        { "number": 1, "title": "The Mapmaker's Apprentice" },
+        { "number": 2, "title": "Secrets of the Compass" },
+        { "number": 3, "title": "The Journey Begins" }
+    ]
+}

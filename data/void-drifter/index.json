@@ -1,0 +1,13 @@
+{
+    "title": "Void Drifter",
+    "genre": "奇幻",
+    "author": "Jax Orion",
+    "date": "2023-09-10",
+    "description": "A lone pilot navigates the remnants of a fallen galactic empire, scavenging for survival.",
+    "status": "ongoing",
+    "chapters": [
+        { "number": 1, "title": "The Last Flight" },
+        { "number": 2, "title": "Wasteland of Stars" },
+        { "number": 3, "title": "Echoes of War" }
+    ]
+}

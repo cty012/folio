@@ -1,0 +1,13 @@
+{
+    "title": "The Crimson Cipher",
+    "genre": "悬疑",
+    "author": "Elara Vance",
+    "date": "2022-11-01",
+    "description": "A cryptic message left in a rare book sends a historian on a dangerous city-wide hunt.",
+    "status": "on-hiatus",
+    "chapters": [
+        { "number": 1, "title": "The Rare Book" },
+        { "number": 2, "title": "Decoding the Past" },
+        { "number": 3, "title": "Chasing Shadows" }
+    ]
+}

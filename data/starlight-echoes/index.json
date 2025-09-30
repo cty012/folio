@@ -1,0 +1,13 @@
+{
+    "title": "Starlight Echoes",
+    "genre": "科幻",
+    "author": "Jax Orion",
+    "date": "2024-01-20",
+    "description": "The last human archivist receives a signal from a long-lost colony ship.",
+    "status": "completed",
+    "chapters": [
+        { "number": 1, "title": "The Archivist" },
+        { "number": 2, "title": "Signal from the Stars" },
+        { "number": 3, "title": "Voyage to the Unknown" }
+    ]
+}
