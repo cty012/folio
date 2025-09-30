@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from "next/link";
 import { Novel } from "@/lib/definitions";
 
 export default function NovelCard({ novel }: { novel: Novel }) {

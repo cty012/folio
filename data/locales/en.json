@@ -1,0 +1,19 @@
+{
+    "page_title": "All Novels",
+    "group_by": "Group By",
+    "sort_by": "Sort By",
+    "genre": "Genre",
+    "author": "Author",
+    "date": "Date",
+    "title": "Title",
+    "status": "Status",
+    "ongoing": "Ongoing",
+    "completed": "Completed",
+    "on-hiatus": "On Hiatus",
+    "back_to_all_novels": "Back to All Novels",
+    "by": "by",
+    "table_of_contents": "Table of Contents",
+    "chapter": "Chapter {number}",
+    "previous_chapter": "Previous Chapter",
+    "next_chapter": "Next Chapter"
+}

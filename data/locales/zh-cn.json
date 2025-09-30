@@ -1,0 +1,19 @@
+{
+    "page_title": "所有小说",
+    "group_by": "分组",
+    "sort_by": "排序",
+    "genre": "类型",
+    "author": "作者",
+    "date": "日期",
+    "title": "标题",
+    "status": "状态",
+    "ongoing": "连载中",
+    "completed": "已完结",
+    "on-hiatus": "暂停连载",
+    "back_to_all_novels": "返回所有小说",
+    "by": "作者: ",
+    "table_of_contents": "目录",
+    "chapter": "第 {number} 章",
+    "previous_chapter": "上一章",
+    "next_chapter": "下一章"
+}
