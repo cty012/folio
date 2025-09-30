@@ -51,19 +51,25 @@ All your novel data and content live in the `/data` directory.
 The project uses a specific folder structure to organize novels and chapters:
 
 ```
-/data
+data/
 ├── settings.json
-└── [novel-id]/
-    ├── index.json
-    └── chapter-1.md
-    └── chapter-2.md
+├── novels/
+|   └── [novel-id]/
+|       ├── index.json
+|       ├── chapter-1.md
+|       ├── chapter-2.md
+|       └── ...
+└── locales/
+    ├── en.json
+    ├── zh-cn.json
     └── ...
 ```
 
-- `settings.json`: Contains global site settings, such as the language ("language": "en").
-- `[novel-id]/`: A folder for each novel. The folder name can be any unique identifier for the novel.
-- `index.json`: Holds all the metadata for a single novel, including its title, author, description, and a list of chapters.
-- `chapter-[number].md`: The actual content for each chapter, written in Markdown. The file name must correspond to the chapter number defined in index.json.
+- `data/settings.json`: Contains global site settings, such as the language ("language": "en").
+- `data/novels/[novel-id]/`: A folder for each novel. The folder name can be any unique identifier for the novel.
+- `data/novels/[novel-id]/index.json`: Holds all the metadata for a single novel, including its title, genre, author, date, description, status (ongoing/completed/on hiatus), and a list of chapters.
+- `data/novels/[novel-id]/chapter-[number].md`: The actual content for each chapter, written in Markdown. The file name must correspond to the chapter number defined in index.json.
+- `data/locales/`: Contains JSON files for different languages to localize UI text. You can add more languages by creating additional JSON files.
 
 ## Building for Production
 
@@ -93,7 +99,7 @@ python -m http.server
 
 ## Technology Stack
 
+- Language: TypeScript
 - Framework: Next.js
 - Styling: Tailwind CSS with the Typography plugin
-- Language: TypeScript
 - Markdown Processing: Remark
