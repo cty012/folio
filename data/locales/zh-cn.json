@@ -15,5 +15,7 @@
     "table_of_contents": "目录",
     "chapter": "第 {number} 章",
     "previous_chapter": "上一章",
-    "next_chapter": "下一章"
+    "next_chapter": "下一章",
+    "page_not_found": "页面不存在",
+    "page_not_found_message": "您访问的页面不存在。"
 }
