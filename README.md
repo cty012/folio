@@ -135,10 +135,10 @@ A push of the application repository cannot include files outside its working tr
 Markdown images are supported in chapter reading and editing previews:
 
 ```markdown
-![A description of the image](/images/folio-logo.png)
+![A description of the image](/images/folio-logo.svg)
 ```
 
-This working example uses `public/images/folio-logo.png`, copied from Folio's existing app icon. Open **Formatting Examples → Images in a Chapter** in the bundled library to see it rendered. The example works offline and is included in static exports.
+This working example uses `public/images/folio-logo.svg`, Folio's Folded F icon drawn in SVG. Open **Formatting Examples → Images in a Chapter** in the bundled library to see it rendered. The example works offline and is included in static exports.
 
 For another local image, place the file under `public/images/` and use `/images/your-file.png` in Markdown. Do not include `public` in the URL. HTTPS image URLs also work, but need network access. Use meaningful alternative text between the square brackets.
 

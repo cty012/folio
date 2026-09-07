@@ -1,14 +1,14 @@
 Images use ordinary Markdown. Here is a local image of the Folio logo:
 
-![Folio logo: a stylized open book above the word Folio](/images/folio-logo.png)
+![Folio logo: a folded letter F on a forest-green tile](/images/folio-logo.svg)
 
 The Markdown for this image is:
 
 ```markdown
-![Folio logo: a stylized open book above the word Folio](/images/folio-logo.png)
+![Folio logo: a folded letter F on a forest-green tile](/images/folio-logo.svg)
 ```
 
-The file lives at `public/images/folio-logo.png` in the application folder. The leading `/` makes the URL work from every chapter, including in a static export. Leave `public` out of the URL.
+The file lives at `public/images/folio-logo.svg` in the application folder. The leading `/` makes the URL work from every chapter, including in a static export. Leave `public` out of the URL.
 
 The text inside the square brackets describes the image for readers using a screen reader and appears if the image cannot load.
 
