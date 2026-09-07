@@ -1,0 +1,11 @@
+{
+  "title": "Formatting Examples",
+  "author": "Folio",
+  "genre": "Examples",
+  "date": "2026-09-06",
+  "description": "Small, editable examples of the Markdown supported in Folio, starting with local images.",
+  "status": "completed",
+  "chapters": [
+    { "number": 1, "title": "Images in a Chapter" }
+  ]
+}
