@@ -1,25 +1,95 @@
 "use client";
+import { useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import type { BookView } from "@/lib/definitions";
 import { Icon } from "./Icons";
 import { useLabels } from "./Labels";
-export default function ReaderView({ novel, number, title, html, toolbar, editor, notice }: {
+import WordCount from "./WordCount";
+import { contentsOf } from "@/lib/contents";
+import { lastReadKey } from "@/lib/appearance";
+import { proseClass } from "@/lib/prose";
+
+/** Novels longer than this open the contents rail with only the current volume expanded. */
+const COLLAPSE_AFTER = 40;
+const RAIL_GAP = 16;
+
+export default function ReaderView({ novel, number, title, html, toolbar, editor, notice, wordCount, titleField }: {
   novel: BookView; number: number; title: string; html: string;
   toolbar?: React.ReactNode; editor?: React.ReactNode; notice?: React.ReactNode;
+  wordCount?: number;
+  /** Replaces the chapter heading while its title is being edited. */
+  titleField?: React.ReactNode;
 }) {
   const t = useLabels(); const index = novel.chapters.findIndex(chapter => chapter.number === number);
   const previous = novel.chapters[index - 1]; const next = novel.chapters[index + 1];
-  const contents = <nav aria-label={t.contents}><ol>{novel.chapters.map((chapter, i) => <li key={chapter.number}><Link aria-current={chapter.number === number ? "page" : undefined} href={`/novels/${novel.id}/chapter-${chapter.number}/`}><span>{String(i + 1).padStart(2, "0")}</span><span>{chapter.title}</span>{chapter.state === "draft" && <small>{t.draft}</small>}</Link></li>)}</ol></nav>;
-  return <main className="reader-page page-width">
-    <div className="reader-breadcrumb"><Link className="breadcrumb" href={`/novels/${novel.id}/`}><Icon name="back" size={16} /><span>{novel.title}</span></Link><span className="muted">{index + 1} / {novel.chapters.length}</span></div>
-    <div className="reader-layout">
-      <aside className="reader-sidebar"><p className="eyebrow">{t.contents}</p><Link className="reader-book-title" href={`/novels/${novel.id}/`}>{novel.title}</Link>{contents}</aside>
+  const prose = useMemo(() => proseClass(html), [html]);
+  const rail = useRef<HTMLElement>(null);
+  const railList = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try { localStorage.setItem(lastReadKey(novel.id), String(number)); } catch { /* Bookmarks are optional. */ }
+  }, [novel.id, number]);
+  // Keep the whole rail inside the window: it starts below the header and, once the page
+  // scrolls, sticks to the top. CSS alone cannot know the starting offset, so measure it.
+  useEffect(() => {
+    const element = rail.current;
+    if (!element) return;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      const top = Math.max(element.getBoundingClientRect().top, RAIL_GAP);
+      element.style.maxHeight = `${Math.max(window.innerHeight - top - RAIL_GAP, 200)}px`;
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(fit); };
+    fit();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => { window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); cancelAnimationFrame(frame); };
+  }, []);
+  // Bring the current chapter into view inside the rail without scrolling the page.
+  useEffect(() => {
+    const list = railList.current, current = list?.querySelector<HTMLElement>("[aria-current='page']");
+    if (!list || !current) return;
+    const offset = current.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+    list.scrollTop = Math.max(offset - list.clientHeight / 3, 0);
+  }, [number]);
+
+  const chapterLink = (number: number) => {
+    const i = novel.chapters.findIndex(chapter => chapter.number === number); const chapter = novel.chapters[i];
+    return <li key={`chapter-${number}`}><Link aria-current={number === novel.chapters[index]?.number ? "page" : undefined} href={`/novels/${novel.id}/chapter-${number}/`}><span>{i + 1}</span><span>{chapter.title}</span>{chapter.state === "draft" && <small>{t.draft}</small>}{chapter.state === "revised" && <small className="revised" title={t.revised_hint}>{t.revised}</small>}</Link></li>;
+  };
+  const collapse = novel.chapters.length > COLLAPSE_AFTER;
+  const contents = (id: string) => <nav aria-label={t.contents} id={id}><ol>{contentsOf(novel).map(entry => entry.type === "chapter" ? chapterLink(entry.number) : <li className="reader-volume" key={`volume-${entry.id}`}>
+    <details open={!collapse || entry.chapters.some(chapter => chapter.number === number)}>
+      <summary><Icon name="down" size={14} /><span>{entry.title}</span><small>{entry.chapters.length}</small></summary>
+      <ol>{entry.chapters.map(chapter => chapterLink(chapter.number))}</ol>
+    </details>
+  </li>)}</ol></nav>;
+  const position = <span className="reader-position">{index + 1} / {novel.chapters.length}</span>;
+
+  return <main className="reader-page">
+    <div className="reader-progress" aria-hidden="true" />
+    <div className="reader-layout page-width">
+      <aside className="reader-sidebar" ref={rail}>
+        <Link className="rail-novel" href={`/novels/${novel.id}/`}><Icon name="back" size={15} /><span>{novel.title}</span></Link>
+        <div className="rail-heading"><p className="eyebrow">{t.contents}</p>{position}</div>
+        <div className="rail-list" ref={railList}>{contents("reader-contents")}</div>
+      </aside>
       <section className="reader-main">
-        <details className="mobile-contents"><summary><Icon name="list" size={17} />{t.contents}</summary>{contents}</details>
-        {toolbar && <div className="reader-tools">{toolbar}</div>}{notice}
+        <div className="reader-bar">
+          <Link className="breadcrumb" href={`/novels/${novel.id}/`}><Icon name="back" size={16} /><span>{novel.title}</span></Link>
+          {position}
+        </div>
+        <details className="mobile-contents"><summary><Icon name="list" size={16} />{t.contents}</summary>{contents("mobile-contents")}</details>
+        {(toolbar || notice) && <div className={editor ? "reader-tools editing" : "reader-tools"}>{toolbar && <div className="reader-toolbar">{toolbar}</div>}{notice}</div>}
         <div className="reader-paper">
-          <header className="chapter-heading"><p className="eyebrow">{t.chapter.replace("{number}", String(index + 1))}</p><h1>{title}</h1><span className="chapter-rule" /></header>
-          {editor || <article className="prose prose-slate dark:prose-invert reader-prose" dangerouslySetInnerHTML={{ __html: html }} />}
+          <header className="chapter-heading">
+            <p className="eyebrow">{t.chapter.replace("{number}", String(index + 1))}</p>
+            {titleField ?? <h1>{title}</h1>}
+            <span className="chapter-rule" />
+            <p className="reader-word-count"><WordCount count={wordCount ?? novel.chapters[index]?.wordCount ?? 0} /></p>
+          </header>
+          {editor || <article className={prose} dangerouslySetInnerHTML={{ __html: html }} />}
         </div>
         <footer className="reader-pagination">
           {previous ? <Link href={`/novels/${novel.id}/chapter-${previous.number}/`}><Icon name="back" size={18} /><span><small>{t.previous_chapter}</small><strong>{previous.title}</strong></span></Link> : <span />}

@@ -8,7 +8,7 @@ export default function NovelForm({ novel, genres, busy, onSubmit, onCancel }: {
   const t = useLabels();
   return <form className="edit-form" onSubmit={event => { event.preventDefault(); onSubmit(Object.fromEntries(new FormData(event.currentTarget))); }}>
     <fieldset disabled={busy}>
-      <label>{t.title}<input name="title" defaultValue={novel?.title} required maxLength={200} autoFocus /></label>
+      <label>{t.title}<input name="title" defaultValue={novel?.title} required maxLength={200} data-autofocus /></label>
       <div className="form-columns"><label>{t.author}<input name="author" defaultValue={novel?.author} required maxLength={200} /></label>
       <label>{t.genre}<select name="genreKey" defaultValue={novel?.genreKey ?? novel?.genre ?? genres.genres[0]?.id ?? "Uncategorized"}>
         {genres.genres.length ? genres.genres.map(genre => <option value={genre.id} key={genre.id}>{genre.name}</option>) : <option>Uncategorized</option>}

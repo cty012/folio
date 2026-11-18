@@ -1,4 +1,4 @@
-import { ContentError, listNovels, mutateContent, workspaceNovel, listGenres, mutateGenres } from "@/lib/content-store";
+import { ContentError, listNovels, mutateContent, workspaceNovel, listGenres, mutateGenres, deleteNovel } from "@/lib/content-store";
 import { renderMarkdown } from "@/lib/markdown";
 
 export const runtime = "nodejs";
@@ -57,6 +57,8 @@ export async function POST(request: Request) {
       if (typeof input.markdown !== "string" || input.markdown.length > 2_000_000) throw new ContentError("Invalid chapter content.");
       return Response.json({ html: await renderMarkdown(input.markdown) }, { headers: { "Cache-Control": "no-store" } });
     }
-    return Response.json(input.action === "createGenre" || input.action === "renameGenre" ? mutateGenres(input) : mutateContent(input), { headers: { "Cache-Control": "no-store" } });
+    const result = input.action === "deleteNovel" ? deleteNovel(input)
+      : input.action === "createGenre" || input.action === "renameGenre" ? mutateGenres(input) : mutateContent(input);
+    return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { console.error(error); return failure(error); }
 }

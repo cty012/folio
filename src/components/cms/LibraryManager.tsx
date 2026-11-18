@@ -38,7 +38,7 @@ export default function LibraryManager({ novels, genres }: { novels: BookView[];
       <form className="edit-form" onSubmit={event => {
         event.preventDefault(); const name = new FormData(event.currentTarget).get("name");
         run(async () => { await api({ action: genreId ? "renameGenre" : "createGenre", genreId, name, revision: genres.revision }); close(); router.refresh(); });
-      }}><fieldset disabled={busy}><label>{t.genre_name}<input name="name" required maxLength={200} autoFocus defaultValue={genres.genres.find(genre => genre.id === genreId)?.name} /></label><footer className="form-actions"><button type="button" className="button" onClick={close}>{t.cancel}</button><button className="button primary">{t.save_genre}</button></footer></fieldset></form>
+      }}><fieldset disabled={busy}><label>{t.genre_name}<input name="name" required maxLength={200} data-autofocus defaultValue={genres.genres.find(genre => genre.id === genreId)?.name} /></label><footer className="form-actions"><button type="button" className="button" onClick={close}>{t.cancel}</button><button className="button primary">{t.save_genre}</button></footer></fieldset></form>
     </Modal>}
   </>;
 }

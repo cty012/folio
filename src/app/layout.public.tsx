@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { getDictionary, getLanguage } from "@/lib/dictionary";
+import { appearanceScript } from "@/lib/appearance";
 import { Labels } from "@/components/Labels";
 import { FolioMark } from "@/components/FolioMark";
+import Appearance from "@/components/Appearance";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 export const metadata: Metadata = {
   title: "Folio",
@@ -16,9 +19,18 @@ export const metadata: Metadata = {
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const dictionary = getDictionary();
-  return <html lang={getLanguage()}><body><Labels value={dictionary}>
-    <a className="skip-link" href="#page-content">{dictionary.reading}</a>
-    <header className="app-header"><div className="page-width header-inner"><a className="wordmark" href="/" aria-label="Folio"><FolioMark /><span>folio<span className="wordmark-period">.</span></span></a><a className="header-library" href="/">{dictionary.library}</a><span className="header-note">{process.env.FOLIO_MODE === "cms" ? dictionary.local_library : dictionary.reading}</span></div></header>
-    <div id="page-content">{children}</div>
-  </Labels></body></html>;
+  // The appearance script sets theme and text-size attributes on <html> before hydration.
+  return <html lang={getLanguage()} suppressHydrationWarning>
+    <head><script dangerouslySetInnerHTML={{ __html: appearanceScript }} /></head>
+    <body><Labels value={dictionary}>
+      <a className="skip-link" href="#page-content">{dictionary.reading}</a>
+      <header className="app-header"><div className="page-width header-inner">
+        <a className="wordmark" href="/" aria-label="Folio"><span className="wordmark-mark"><FolioMark size={19} /></span><span className="wordmark-text">folio<span className="wordmark-period">.</span></span></a>
+        <nav className="header-nav"><a href="/">{dictionary.library}</a></nav>
+        <span className="header-note">{process.env.FOLIO_MODE === "cms" ? dictionary.local_library : dictionary.reading}</span>
+        <Appearance />
+      </div></header>
+      <div id="page-content">{children}</div>
+    </Labels></body>
+  </html>;
 }

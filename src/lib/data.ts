@@ -1,14 +1,21 @@
 import type { Novel } from "./definitions";
 import { listNovels, readNovel, readMarkdown } from "./content-store";
 import { renderMarkdown } from "./markdown";
+import { countWords } from "./word-count";
+import { contentsOf, filterContents } from "./contents";
 
 // Only this public projection reaches reader pages and their serialized props.
 function publicNovel(novel: ReturnType<typeof listNovels>[number]): Novel {
   return {
     id: novel.id, title: novel.title, author: novel.author, genre: novel.genre,
     description: novel.description, date: novel.date, status: novel.status,
+    characters: novel.characters ?? [],
+    characterCategories: novel.characterCategories ?? [],
+    characterRelations: novel.characterRelations ?? [],
+    contents: filterContents(contentsOf(novel), new Set(novel.chapters.filter(chapter => chapter.published).map(chapter => chapter.number))),
     chapters: novel.chapters.filter(chapter => chapter.published).map(chapter => ({
       number: chapter.number, title: chapter.published!.title,
+      wordCount: countWords(readMarkdown(novel.id, chapter.published!.contentFile)),
     })),
   };
 }

@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import type { StoredNovel, WorkspaceNovel, GenreState } from "./definitions.ts";
+import { countWords } from "./word-count.ts";
+import { chapterOrder, contentsOf, filterContents } from "./contents.ts";
+import type { ContentsEntry } from "./definitions.ts";
+import type { StoredNovel, WorkspaceNovel, GenreState, NovelCharacter, CharacterRelation } from "./definitions.ts";
 
 export class ContentError extends Error {
   status: number;
@@ -51,6 +54,85 @@ function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+type Cast = { characters: NovelCharacter[]; categories: string[]; relations: CharacterRelation[] };
+
+/** Validates character profiles together with their categories and relationships. */
+function cast(rawCharacters: unknown, rawCategories: unknown = [], rawRelations: unknown = []): Cast {
+  if (!Array.isArray(rawCharacters) || rawCharacters.length > 100) throw new ContentError("Characters must be a list of at most 100 profiles.");
+  if (!Array.isArray(rawCategories) || rawCategories.length > 50) throw new ContentError("Character categories must be a list of at most 50 names.");
+  if (!Array.isArray(rawRelations) || rawRelations.length > 500) throw new ContentError("Character relationships must be a list of at most 500 links.");
+  const categories: string[] = [];
+  for (const value of rawCategories) {
+    const name = text(value, "Category name", 100).trim();
+    if (categories.includes(name)) throw new ContentError("Character category names must be unique.");
+    categories.push(name);
+  }
+  const ids = new Set<string>();
+  const characters = rawCharacters.map(value => {
+    const character = record(value);
+    let id = "";
+    if (character.id !== undefined) {
+      if (typeof character.id !== "string" || !/^[a-z0-9][a-z0-9_-]{0,99}$/i.test(character.id)) throw new ContentError("Use letters, numbers, hyphens, or underscores for a character ID.");
+      if (ids.has(character.id)) throw new ContentError("Character IDs must be unique.");
+      id = character.id; ids.add(id);
+    }
+    const category = character.category == null ? "" : text(character.category, "Character category", 100, true).trim();
+    // A category used by a character but missing from the list joins the end of it.
+    if (category && !categories.includes(category)) {
+      if (categories.length >= 50) throw new ContentError("Character categories must be a list of at most 50 names.");
+      categories.push(category);
+    }
+    return {
+      id, name: text(character.name, "Character name").trim(),
+      role: text(character.role ?? "", "Character role", 200, true).trim(),
+      introduction: text(character.introduction ?? "", "Character introduction", 10000, true),
+      ...(category ? { category } : {}),
+    };
+  });
+  // Hand-written profiles may omit IDs; derive stable ones that avoid explicit IDs.
+  let next = 1;
+  for (const character of characters) {
+    if (character.id) continue;
+    while (ids.has(`character-${next}`)) next++;
+    character.id = `character-${next}`; ids.add(character.id);
+  }
+  const relations = rawRelations.map(value => {
+    const relation = record(value);
+    const { from, to } = relation;
+    if (typeof from !== "string" || typeof to !== "string" || !ids.has(from) || !ids.has(to))
+      throw new ContentError("Each relationship must connect two existing characters.");
+    if (from === to) throw new ContentError("A relationship must connect two different characters.");
+    if (relation.mutual !== undefined && typeof relation.mutual !== "boolean") throw new ContentError("Invalid relationship direction.");
+    const label = text(relation.label, "Relationship", 60).trim();
+    return relation.mutual ? { from, to, label, mutual: true } : { from, to, label };
+  });
+  return { characters, categories, relations };
+}
+
+function normalizeContents(value: unknown, numbers: number[]): ContentsEntry[] {
+  if (!Array.isArray(value)) throw new ContentError("Contents must be an ordered list.");
+  const seen = new Set<number>(); const volumes = new Set<string>();
+  const chapter = (value: unknown) => {
+    const raw = record(value);
+    if (raw.type !== "chapter" || typeof raw.number !== "number" || !numbers.includes(raw.number) || seen.has(raw.number))
+      throw new ContentError("Contents must reference every chapter exactly once, with no nested volumes.");
+    seen.add(raw.number);
+    return { type: "chapter" as const, number: raw.number };
+  };
+  const contents = value.map((value): ContentsEntry => {
+    const raw = record(value);
+    if (raw.type === "chapter") return chapter(raw);
+    if (raw.type !== "volume") throw new ContentError("Unknown contents entry.");
+    const id = identifier(raw.id);
+    if (volumes.has(id)) throw new ContentError("Volume IDs must be unique.");
+    volumes.add(id);
+    if (!Array.isArray(raw.chapters) || !raw.chapters.length) throw new ContentError("A volume must contain at least one chapter.");
+    return { type: "volume", id, title: text(raw.title, "Volume title").trim(), description: text(raw.description ?? "", "Volume description", 10000, true), chapters: raw.chapters.map(chapter) };
+  });
+  if (seen.size !== numbers.length) throw new ContentError("Contents must reference every chapter exactly once.");
+  return contents;
+}
+
 function normalize(value: unknown, id: string): StoredNovel {
   const raw = record(value);
   if (!Array.isArray(raw.chapters)) throw new ContentError("Missing chapter list.");
@@ -74,13 +156,26 @@ function normalize(value: unknown, id: string): StoredNovel {
       };
     return { number, title, contentFile: file, published };
   });
-  return {
+  const contents = raw.contents === undefined ? undefined : normalizeContents(raw.contents, chapters.map(chapter => chapter.number));
+  const ordered = contents ? chapterOrder(contents).map(number => chapters.find(chapter => chapter.number === number)!) : chapters;
+  return withCast({
     id, title: text(raw.title, "Title"), author: text(raw.author, "Author"),
     genreKey: text(raw.genreKey ?? raw.genre, "Genre key"),
     genre: genreName(text(raw.genreKey ?? raw.genre, "Genre key")), description: text(raw.description, "Description", 10000, true),
     date: text(raw.date, "Date", 40), status: raw.status as StoredNovel["status"],
-    publication: (raw.publication ?? "published") as StoredNovel["publication"], chapters,
-  };
+    characters: [], // Placeholder that keeps the key's position in index.json.
+    publication: (raw.publication ?? "published") as StoredNovel["publication"], chapters: ordered,
+    ...(contents ? { contents } : {}),
+  }, cast(raw.characters ?? [], raw.characterCategories ?? [], raw.characterRelations ?? []));
+}
+
+/** Stores a validated cast, leaving empty category and relationship lists out of index.json. */
+function withCast(novel: StoredNovel, { characters, categories, relations }: Cast): StoredNovel {
+  const result: StoredNovel = { ...novel, characters };
+  delete result.characterCategories; delete result.characterRelations;
+  if (categories.length) result.characterCategories = categories;
+  if (relations.length) result.characterRelations = relations;
+  return result;
 }
 
 export function readNovel(id: string): StoredNovel | undefined {
@@ -112,8 +207,10 @@ export function workspaceNovel(id: string): WorkspaceNovel {
   const chapters = novel.chapters.map(chapter => {
     const markdown = readMarkdown(id, chapter.contentFile);
     hash.update(JSON.stringify([chapter.number, markdown]));
-    if (chapter.published) hash.update(readMarkdown(id, chapter.published.contentFile));
-    return { ...chapter, markdown };
+    const publishedMarkdown = chapter.published ? readMarkdown(id, chapter.published.contentFile) : null;
+    if (publishedMarkdown !== null) hash.update(publishedMarkdown);
+    const unpublishedChanges = !!chapter.published && (chapter.published.title !== chapter.title || publishedMarkdown !== markdown);
+    return { ...chapter, markdown, wordCount: countWords(markdown), publishedWordCount: publishedMarkdown === null ? null : countWords(publishedMarkdown), unpublishedChanges };
   });
   return { ...novel, chapters, revision: hash.digest("hex") };
 }
@@ -188,6 +285,32 @@ function commit(novel: StoredNovel, writes: DraftWrite[] = []) {
 
 export type Mutation = Record<string, unknown>;
 
+export function deleteNovel(input: Mutation): { deleted: true; id: string } {
+  const id = identifier(input.id);
+  if (!readNovel(id)) throw new ContentError("Novel not found.", 404);
+  let lock = safePath("novels", id, ".write-lock");
+  try { fs.mkdirSync(lock); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw new ContentError("This novel is being saved. Retry shortly.", 409);
+    throw error;
+  }
+  try {
+    if (input.revision !== workspaceNovel(id).revision)
+      throw new ContentError("This novel changed in another tab or editor. Reload before deleting it.", 409);
+    const trash = safePath(".trash", "novels");
+    fs.mkdirSync(trash, { recursive: true });
+    const destination = safePath(".trash", "novels", `${id}--${randomUUID()}`);
+    // One atomic move retains the complete manuscript, snapshots and history.
+    fs.renameSync(safePath("novels", id), destination);
+    lock = path.join(destination, ".write-lock");
+    for (const directory of [safePath("novels"), trash]) {
+      const descriptor = fs.openSync(directory, "r");
+      try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); }
+    }
+    return { deleted: true, id };
+  } finally { fs.rmdirSync(lock); }
+}
+
 export function mutateContent(input: Mutation): WorkspaceNovel {
   if (input.action === "createNovel") {
     const title = text(input.title, "Title").trim();
@@ -217,7 +340,7 @@ export function mutateContent(input: Mutation): WorkspaceNovel {
     const current = workspaceNovel(id);
     if (input.revision !== current.revision)
       throw new ContentError("This novel changed in another tab or editor. Copy your unsaved text, then reload the latest version.", 409);
-    const novel = readNovel(id)!;
+    let novel = readNovel(id)!;
     const writes: DraftWrite[] = [];
     if (input.action === "updateNovel") {
       novel.title = text(input.title, "Title").trim();
@@ -227,17 +350,38 @@ export function mutateContent(input: Mutation): WorkspaceNovel {
       novel.genre = genreName(novel.genreKey);
       if (!["ongoing", "completed", "on-hiatus"].includes(String(input.status))) throw new ContentError("Invalid novel status.");
       novel.status = input.status as StoredNovel["status"];
+    } else if (input.action === "updateCharacters") {
+      // Categories and relationships are optional; omitted ones are kept, minus links to removed characters.
+      const kept = new Set(Array.isArray(input.characters) ? input.characters.map(character => (character as Record<string, unknown>)?.id) : []);
+      const relations = input.relations ?? (novel.characterRelations ?? []).filter(relation => kept.has(relation.from) && kept.has(relation.to));
+      novel = withCast(novel, cast(input.characters, input.categories ?? novel.characterCategories ?? [], relations));
+    } else if (input.action === "updateContents") {
+      novel.contents = normalizeContents(input.contents, novel.chapters.map(chapter => chapter.number));
     } else if (input.action === "createChapter") {
       let number = Math.max(0, ...novel.chapters.map(chapter => chapter.number)) + 1;
       while (fs.existsSync(safePath("novels", id, `chapter-${number}.md`))) number++;
       if (!Number.isSafeInteger(number)) throw new ContentError("No chapter IDs remain available.");
+      if (input.volumeId || input.newVolumeTitle || novel.contents) {
+        const contents = contentsOf(novel);
+        const entry = { type: "chapter" as const, number };
+        if (input.newVolumeTitle) {
+          contents.push({ type: "volume", id: randomUUID(), title: text(input.newVolumeTitle, "Volume title").trim(), description: "", chapters: [entry] });
+        } else if (input.volumeId) {
+          const volume = contents.find(entry => entry.type === "volume" && entry.id === input.volumeId);
+          if (!volume || volume.type !== "volume") throw new ContentError("Volume not found.", 404);
+          volume.chapters.push(entry);
+        } else contents.push(entry);
+        novel.contents = contents;
+      }
       novel.chapters.push({ number, title: text(input.title, "Chapter title"), contentFile: `chapter-${number}.md`, published: null });
       writes.push({ file: `chapter-${number}.md`, markdown: "" });
     } else if (input.action === "reorder") {
+      if (novel.contents?.some(entry => entry.type === "volume")) throw new ContentError("Use the contents organizer to move chapters in volumes.");
       const order = input.order;
       if (!Array.isArray(order) || order.length !== novel.chapters.length || new Set(order).size !== order.length || order.some(number => !novel.chapters.some(chapter => chapter.number === number)))
         throw new ContentError("Order must contain every chapter exactly once.");
       novel.chapters = order.map(number => novel.chapters.find(chapter => chapter.number === number)!);
+      if (novel.contents) novel.contents = novel.chapters.map(chapter => ({ type: "chapter", number: chapter.number }));
     } else {
       const chapter = novel.chapters.find(chapter => chapter.number === input.number);
       if (!chapter) throw new ContentError("Chapter not found.", 404);
@@ -254,6 +398,14 @@ export function mutateContent(input: Mutation): WorkspaceNovel {
         novel.publication = "published";
       } else if (input.action === "unpublishChapter") {
         chapter.published = null;
+        if (!novel.chapters.some(item => item.published)) novel.publication = "draft";
+      } else if (input.action === "deleteChapter") {
+        // Retain Markdown and reserve this route ID even for snapshot-only indexes.
+        const retainedFile = `chapter-${chapter.number}.md`;
+        if (!fs.existsSync(safePath("novels", id, retainedFile)))
+          writes.push({ file: retainedFile, markdown: readMarkdown(id, chapter.contentFile) });
+        novel.chapters = novel.chapters.filter(item => item.number !== chapter.number);
+        if (novel.contents) novel.contents = filterContents(novel.contents, new Set(novel.chapters.map(chapter => chapter.number)));
         if (!novel.chapters.some(item => item.published)) novel.publication = "draft";
       } else throw new ContentError("Unknown action.");
     }
